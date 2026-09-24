@@ -42,11 +42,16 @@ button.pc:not(:disabled):hover,button.pc:not(:disabled):hover~.pc{background:var
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .pill{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:3px 9px;font-size:.8rem}
 .pill b{color:var(--acc)}
-.step{border-left:4px solid var(--acc);background:var(--bg);padding:8px 10px;border-radius:0 8px 8px 0;min-height:64px;margin-top:8px}
+.step{border-left:4px solid var(--acc);background:var(--bg);padding:8px 10px;border-radius:0 8px 8px 0;min-height:120px;margin-top:8px;line-height:1.65}
+.yes{color:var(--min);font-weight:700}.no{color:var(--ok);font-weight:700}
+.nx{margin-top:8px;padding-top:6px;border-top:1px dashed var(--bd);color:var(--mut);font-size:.85rem}
 .final{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--maxb);color:var(--tx);font-size:.9rem}
 .ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
 .ctl button,.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:6px 11px;border-radius:8px;font:inherit;cursor:pointer}
-.ctl button.pri,.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.ctl button.pri,.btn.pri{color:var(--acc);border-color:var(--acc);font-weight:600}
+.ctl button:disabled{opacity:.4;cursor:default}
+@media(hover:hover){.ctl button:not(:disabled):hover,.btn:hover{background:var(--acc);color:#fff;border-color:var(--acc)}}
+.ctl button:focus-visible,.btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.78rem;color:var(--mut);margin-bottom:8px}
 .leg span:before{content:"";display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid}
 .leg .a:before{background:var(--maxb);border-color:var(--max)}.leg .b:before{background:var(--minb);border-color:var(--min)}
@@ -146,10 +151,11 @@ function run(n,a,b,ab){
   const mx=n.turn==='MAX';let best=mx?-Infinity:Infinity;
   for(let i=0;i<n.ch.length;i++){
     const c=n.ch[i],v=run(c,a,b,ab);
+    const a0=a,b0=b;
     if(mx?v>best:v<best)n.bestId=c.id;
     if(mx){best=Math.max(best,v);if(ab)a=Math.max(a,best)}
     else{best=Math.min(best,v);if(ab)b=Math.min(b,best)}
-    ev.push({t:'upd',id:n.id,a,b,v:best,from:c.id,cv:v});
+    ev.push({t:'upd',id:n.id,a,b,a0,b0,v:best,from:c.id,cv:v,rem:n.ch.length-1-i});
     if(ab&&a>=b&&i<n.ch.length-1){ // poda: α ≥ β
       const rest=n.ch.slice(i+1),ids=[];rest.forEach(x=>sub(x,ids));
       ev.push({t:'prune',id:n.id,a,b,v:best,ids,cut:rest.map(x=>x.id)});break;
@@ -172,14 +178,41 @@ function derive(k){
   return st;
 }
 function desc(e){
-  const n=nodes[e.id],mx=n.turn==='MAX',A=S.algo==='ab'?` (α=${fmt(e.a)}, β=${fmt(e.b)})`:'';
-  if(e.t==='in')return `Visitamos <b>${lab(n)}</b>: turno de ${n.turn}${A}.`;
-  if(e.t==='upd')return `<b>${lab(nodes[e.from])}</b> devuelve ${fmt(e.cv)}. ${n.turn} ${mx?'maximiza':'minimiza'}: mejor valor en <b>${lab(n)}</b> = ${fmt(e.v)}${A}.`;
-  if(e.t==='prune')return `<b>α ≥ β</b> (${fmt(e.a)} ≥ ${fmt(e.b)}) en ${lab(n)}: se poda ✕ ${e.cut.length} rama(s), ${e.ids.length} nodo(s) sin evaluar.`;
+  const n=nodes[e.id],mx=n.turn==='MAX',ab=S.algo==='ab',par=n.parent;
+  if(e.t==='in'){
+    let t=`Visitamos <b>${lab(n)}</b> (turno de ${n.turn}).`;
+    if(ab)t+=`<br>${par?'Hereda de '+lab(par)+':':'Raíz, valores iniciales:'} α=${fmt(e.a)}, β=${fmt(e.b)}.`;
+    t+=n.ch.length?`<br>Explora sus ${n.ch.length} hijo(s) en orden: fila 1 → fila 2, quitando 1, 2, 3…`:'<br>No tiene movimientos: es un estado terminal.';
+    return t;
+  }
+  if(e.t==='upd'){
+    const c=nodes[e.from];
+    let t=`<b>${lab(c)}</b> devuelve <b>${fmt(e.cv)}</b> a <b>${lab(n)}</b> (${n.turn}).`;
+    if(!ab)return t+`<br>${mx?'MAX toma el máximo':'MIN toma el mínimo'} → valor parcial <b>${fmt(e.v)}</b>.`;
+    t+=mx?`<br>Actualiza α = máx(${fmt(e.cv)}, α=${fmt(e.a0)}) → <b>α=${fmt(e.a)}</b>`
+         :`<br>Actualiza β = mín(${fmt(e.cv)}, β=${fmt(e.b0)}) → <b>β=${fmt(e.b)}</b>`;
+    const y=e.a>=e.b;
+    t+=`<br>¿α ≥ β? (${fmt(e.a)} ≥ ${fmt(e.b)}) → <span class="${y?'yes':'no'}">${y?'Sí':'No'}</span>`;
+    t+=y?(e.rem>0?`: se poda, las ${e.rem} rama(s) restantes ya no pueden cambiar la decisión.`:`, pero no quedan ramas por podar.`)
+        :(e.rem>0?`: se continúa con la siguiente rama.`:`: no hay más hijos.`);
+    return t;
+  }
+  if(e.t==='prune'){
+    const why=mx?`MAX ya asegura al menos α=${fmt(e.a)}, y arriba MIN ya tiene una alternativa con β=${fmt(e.b)} ≤ α: MIN nunca dejaría llegar a este nodo.`
+                :`MIN ya asegura como mucho β=${fmt(e.b)}, y arriba MAX ya tiene una alternativa con α=${fmt(e.a)} ≥ β: MAX nunca elegiría este nodo.`;
+    return `<b>Poda ✕ en ${lab(n)}</b><br>${why}<br>Se descartan ${e.cut.map(id=>'<b>'+lab(nodes[id])+'</b>').join(', ')} (${e.ids.length} nodo(s) sin evaluar). Valor devuelto: ${fmt(e.v)}.`;
+  }
   if(e.term)return `Terminal <b>${lab(n)}</b>: el último objeto lo retiró ${opp(n.turn)} → <b>${fmt(e.v)}</b> para MAX.`;
-  return `<b>${lab(n)}</b> queda con valor <b>${fmt(e.v)}</b>.`;
+  return `<b>${lab(n)}</b> termina con valor <b>${fmt(e.v)}</b>.`;
 }
-
+function nextTxt(){
+  const x=ev[step+1];if(!x)return 'Fin de la búsqueda.';
+  const n=nodes[x.id],par=n.parent;
+  if(x.t==='in')return `Siguiente: baja a <b>${lab(n)}</b> (${n.turn}).`;
+  if(x.t==='upd')return `Siguiente: <b>${lab(nodes[x.from])}</b> sube su valor a <b>${lab(n)}</b>.`;
+  if(x.t==='prune')return `Siguiente: se descartan las ramas restantes de <b>${lab(n)}</b>.`;
+  return `Siguiente: <b>${lab(n)}</b> termina con ${fmt(x.v)}${par?' y lo devuelve a '+lab(par):''}.`;
+}
 /* ---------- Dibujo ---------- */
 function boardHTML(cur,prev,inter){
   return cur.map((c,r)=>{
@@ -217,7 +250,8 @@ function render(){
     return `<button class="chip ${cut?'cutc':''}" data-go="${c.id}">F${c.move.r+1} −${c.move.k} → ${lab(c)}<i>${cut?'✕':q&&q.s==='done'?fmt(q.v):'·'}</i></button>`}).join(''):'<span class="mut">Sin movimientos: fin del juego.</span>';
   let seen=0,cut=0;for(let i=0;i<=step;i++){if(ev[i].t==='in')seen++;if(ev[i].t==='prune')cut+=ev[i].ids.length}
   $('#stats').innerHTML=`<span class="pill">Paso <b>${step+1}/${ev.length}</b></span><span class="pill">Evaluados <b>${seen}/${nodes.length}</b></span>`+(S.algo==='ab'?`<span class="pill">Podados <b>${cut}</b></span><span class="pill">α <b>${fmt(e.a)}</b> · β <b>${fmt(e.b)}</b></span>`:'');
-  $('#desc').innerHTML=desc(e);
+  $('#desc').innerHTML=desc(e)+'<div class="nx">'+nextTxt()+'</div>';
+  $('#bF').disabled=$('#bP').disabled=step===0;$('#bN').disabled=$('#bE').disabled=step===ev.length-1;
   const f=$('#final'),last=step===ev.length-1;f.hidden=!last;
   if(last){const b=nodes[root.bestId],cnt=k=>evs[k].filter(x=>x.t==='in').length,m=cnt('mm'),a=cnt('ab');
     f.innerHTML=`<b>Valor de la raíz: ${fmt(ev[step].v)}</b> → ${ev[step].v>0?'MAX gana':'MIN gana'} con juego perfecto.<br>Mejor jugada de ${root.turn}: fila ${b.move.r+1}, quitar ${b.move.k} → ${lab(b)}.<br>Minimax evalúa ${m} nodos; Alfa-Beta ${a} (evita ${m-a}${m?', '+Math.round((m-a)/m*100)+'%':''}).`}
