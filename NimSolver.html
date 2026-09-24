@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Nim · Minimax y Alfa-Beta</title>
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--tx:#1f2430;--mut:#6b7280;--bd:#e3e1da;--max:#2563eb;--maxb:#dbe8ff;--min:#dc2626;--minb:#fde2e0;--ok:#16a34a;--cut:#9ca3af;--acc:#7c5cd6;--coin:#f59e0b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14161b;--card:#1d2027;--tx:#eceef2;--mut:#9aa1ae;--bd:#2f333c;--max:#6ea1ff;--maxb:#1e3560;--min:#ff7b72;--minb:#4a2220;--ok:#4ade80;--cut:#6b7280;--acc:#a78bfa;--coin:#fbbf24}}
+:root[data-theme="dark"]{--bg:#14161b;--card:#1d2027;--tx:#eceef2;--mut:#9aa1ae;--bd:#2f333c;--max:#6ea1ff;--maxb:#1e3560;--min:#ff7b72;--minb:#4a2220;--ok:#4ade80;--cut:#6b7280;--acc:#a78bfa;--coin:#fbbf24}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:14px}
+.bar label{font-size:.8rem;color:var(--mut);display:flex;flex-direction:column;gap:3px}
+select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx)}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--card);color:var(--tx);padding:7px 12px;font:inherit;cursor:pointer}
+.seg button.on{background:var(--acc);color:#fff}
+.grid{display:grid;gap:14px;grid-template-columns:minmax(0,340px) minmax(0,1fr)}
+[data-mode=pl] .grid{grid-template-columns:minmax(0,560px);justify-content:center}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px}
+.card h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:0 0 8px}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.row b{width:52px;font-size:.8rem;color:var(--mut);flex:none}
+.pcs{display:flex;flex-wrap:wrap;gap:8px}
+.pc{width:34px;height:34px;border-radius:50%;background:var(--coin);border:2px solid rgba(0,0,0,.18);padding:0;box-shadow:inset 0 -3px 0 rgba(0,0,0,.15)}
+.pc.gh{background:transparent;border:2px dashed var(--cut);box-shadow:none;opacity:.6}
+button.pc:not(:disabled){cursor:pointer}
+button.pc:not(:disabled):hover,button.pc:not(:disabled):hover~.pc{background:var(--min);border-color:var(--min)}
+.bd{display:inline-block;padding:3px 10px;border-radius:99px;font-weight:600;font-size:.85rem}
+.bd.max{background:var(--maxb);color:var(--max)}.bd.min{background:var(--minb);color:var(--min)}.bd.term{background:var(--bg);color:var(--ok);border:1px solid var(--ok)}
+.mut{color:var(--mut);font-size:.85rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;padding:4px 8px;font:inherit;font-size:.8rem;cursor:pointer}
+.chip i{font-style:normal;font-weight:700;margin-left:4px;color:var(--acc)}
+.chip.cutc{opacity:.55;text-decoration:line-through}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.pill{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:3px 9px;font-size:.8rem}
+.pill b{color:var(--acc)}
+.step{border-left:4px solid var(--acc);background:var(--bg);padding:8px 10px;border-radius:0 8px 8px 0;min-height:64px;margin-top:8px}
+.final{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--maxb);color:var(--tx);font-size:.9rem}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+.ctl button,.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:6px 11px;border-radius:8px;font:inherit;cursor:pointer}
+.ctl button.pri,.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.78rem;color:var(--mut);margin-bottom:8px}
+.leg span:before{content:"";display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid}
+.leg .a:before{background:var(--maxb);border-color:var(--max)}.leg .b:before{background:var(--minb);border-color:var(--min)}
+.leg .c:before{border-color:var(--ok);background:transparent}.leg .d:before{border-color:var(--cut);border-style:dashed}.leg .e:before{border-color:var(--acc);background:var(--acc)}
+#scroll{overflow:auto;border:1px solid var(--bd);border-radius:10px;background:var(--bg);max-height:70vh}
+#tree{display:block}
+.ed{stroke:var(--bd);stroke-width:1.6;fill:none}.ed.cut{stroke:var(--cut);stroke-dasharray:5 4}.ed.best{stroke:var(--acc);stroke-width:4}
+.nd{cursor:pointer}.nd circle{stroke-width:2}
+.nd.max circle{fill:var(--maxb);stroke:var(--max)}.nd.min circle{fill:var(--minb);stroke:var(--min)}
+.nd.term circle{stroke:var(--ok);stroke-width:3}
+.nd.idle{opacity:.4}.nd.open circle{stroke-dasharray:4 3}
+.nd.cut{opacity:.55}.nd.cut circle{fill:var(--bg);stroke:var(--cut);stroke-dasharray:4 3}
+.nd.act circle{stroke:var(--acc);stroke-width:5;stroke-dasharray:none}.nd.sel circle{stroke:var(--acc);stroke-width:3}
+.nd text{fill:var(--tx);text-anchor:middle}.nd .v{font-size:12px;font-weight:700}.nd .l{font-size:10px;fill:var(--mut)}
+.nd.cut .v{fill:var(--min);font-size:16px}.nd .ab{font-size:10px;fill:var(--acc);font-weight:700}
+.playonly,.anonly{display:none}
+[data-mode=pl] .playonly{display:block}[data-mode=an] .anonly{display:block}
+[data-mode=pl] #treeCard{display:none}
+.msg{min-height:44px;margin:8px 0}
+</style>
+</head>
+<body data-mode="an">
+<div class="wrap">
+<h1>Simulador de Nim · Minimax y poda Alfa-Beta</h1>
+<p class="sub">Cada jugador retira uno o más objetos de una sola fila. Gana quien retira el último. Valores desde la perspectiva de MAX: +1 gana, −1 pierde.</p>
+<div class="bar">
+<label>Estado inicial<select id="sState"><option value="1,3">[1, 3]</option><option value="1,2">[1, 2]</option><option value="2,2">[2, 2]</option><option value="2,3">[2, 3]</option></select></label>
+<label>Empieza<select id="sFirst"><option value="MAX">MAX</option><option value="MIN">MIN</option></select></label>
+<label>Algoritmo<span class="seg"><button data-k="algo" data-v="mm">Minimax</button><button data-k="algo" data-v="ab" class="on">Alfa-Beta</button></span></label>
+<label>Modo<span class="seg"><button data-k="mode" data-v="an" class="on">Analizar</button><button data-k="mode" data-v="pl">Jugar vs MAX</button></span></label>
+</div>
+<div class="grid">
+<section class="card">
+<h2 id="gt">Estado del juego</h2>
+<div id="board"></div>
+<div id="turn" style="margin-top:8px"></div>
+<div class="anonly">
+<div class="mut" style="margin-top:10px">Movimientos disponibles (clic para inspeccionar)</div>
+<div class="chips" id="moves"></div>
+<div class="pills" id="stats"></div>
+<div class="step" id="desc"></div>
+<div class="final" id="final" hidden></div>
+</div>
+<div class="playonly">
+<div class="msg" id="pmsg"></div>
+<div class="mut" id="pwin"></div>
+<p class="mut">Toca una ficha: se retiran esa y todas las de su derecha en la fila.</p>
+<button class="btn pri" id="pre">Reiniciar partida</button>
+</div>
+</section>
+<section class="card" id="treeCard">
+<h2>Árbol de búsqueda</h2>
+<div class="ctl">
+<button id="bF" title="Inicio">⏮</button><button id="bP">◀ Anterior</button><button id="bN" class="pri">Siguiente ▶</button><button id="bE" title="Final">⏭</button>
+<button id="bA">▶ Auto</button>
+<select id="sSpd" title="Velocidad"><option value="1100">Lento</option><option value="600" selected>Normal</option><option value="250">Rápido</option></select>
+<button id="bR">↺ Reiniciar</button>
+</div>
+<div class="leg"><span class="a">Nodo MAX</span><span class="b">Nodo MIN</span><span class="c">Terminal</span><span class="d">Podado ✕</span><span class="e">Nodo actual</span></div>
+<div id="scroll"><svg id="tree" role="img" aria-label="Árbol de búsqueda"></svg></div>
+</section>
+</div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const S={state:'1,3',first:'MAX',algo:'ab',mode:'an'};
+let rows0,nodes,root,evs,ev,step,sel,timer,STEP=48,pr,pturn,pover,pmsg,ptimer;
+const fmt=v=>v===Infinity?'+∞':v===-Infinity?'−∞':v>0?'+'+v:v<0?'−'+(-v):'0';
+const lab=n=>'['+n.rows.join(',')+']';
+const opp=t=>t==='MAX'?'MIN':'MAX';
+
+/* ---------- Representación: árbol de estados ---------- */
+function build(rows,turn,parent,move){
+  const n={id:nodes.length,rows,turn,parent,move,ch:[],d:parent?parent.d+1:0};
+  nodes.push(n);
+  // Orden obligatorio: fila 1 antes que fila 2; en cada fila, quitar 1, 2, 3…
+  for(let r=0;r<rows.length;r++)for(let k=1;k<=rows[r];k++){
+    const nr=rows.slice();nr[r]-=k;
+    n.ch.push(build(nr,opp(turn),n,{r,k}));
+  }
+  return n;
+}
+function layout(){
+  let slot=0;
+  (function f(n){if(!n.ch.length)n.x=slot++;else{n.ch.forEach(f);n.x=(n.ch[0].x+n.ch[n.ch.length-1].x)/2}})(root);
+  root.slots=slot;
+}
+const sub=(n,ids)=>{ids.push(n.id);n.ch.forEach(c=>sub(c,ids))};
+
+/* ---------- Minimax / Alfa-Beta: genera la traza de eventos ---------- */
+function run(n,a,b,ab){
+  ev.push({t:'in',id:n.id,a,b});
+  if(!n.ch.length){ // terminal: el último objeto lo retiró el jugador anterior
+    const v=n.turn==='MAX'?-1:1;
+    ev.push({t:'out',id:n.id,a,b,v,term:1});return v;
+  }
+  const mx=n.turn==='MAX';let best=mx?-Infinity:Infinity;
+  for(let i=0;i<n.ch.length;i++){
+    const c=n.ch[i],v=run(c,a,b,ab);
+    if(mx?v>best:v<best)n.bestId=c.id;
+    if(mx){best=Math.max(best,v);if(ab)a=Math.max(a,best)}
+    else{best=Math.min(best,v);if(ab)b=Math.min(b,best)}
+    ev.push({t:'upd',id:n.id,a,b,v:best,from:c.id,cv:v});
+    if(ab&&a>=b&&i<n.ch.length-1){ // poda: α ≥ β
+      const rest=n.ch.slice(i+1),ids=[];rest.forEach(x=>sub(x,ids));
+      ev.push({t:'prune',id:n.id,a,b,v:best,ids,cut:rest.map(x=>x.id)});break;
+    }
+  }
+  ev.push({t:'out',id:n.id,a,b,v:best});
+  return best;
+}
+function trace(ab){ev=[];run(root,-Infinity,Infinity,ab);return ev}
+
+/* ---------- Estado derivado de la traza hasta el paso k ---------- */
+function derive(k){
+  const st={};
+  for(let i=0;i<=k;i++){const e=ev[i];
+    if(e.t==='in')st[e.id]={s:'open',v:null};
+    else if(e.t==='upd')st[e.id].v=e.v;
+    else if(e.t==='out')st[e.id]={s:'done',v:e.v};
+    else e.ids.forEach(id=>st[id]={s:'cut'});
+  }
+  return st;
+}
+function desc(e){
+  const n=nodes[e.id],mx=n.turn==='MAX',A=S.algo==='ab'?` (α=${fmt(e.a)}, β=${fmt(e.b)})`:'';
+  if(e.t==='in')return `Visitamos <b>${lab(n)}</b>: turno de ${n.turn}${A}.`;
+  if(e.t==='upd')return `<b>${lab(nodes[e.from])}</b> devuelve ${fmt(e.cv)}. ${n.turn} ${mx?'maximiza':'minimiza'}: mejor valor en <b>${lab(n)}</b> = ${fmt(e.v)}${A}.`;
+  if(e.t==='prune')return `<b>α ≥ β</b> (${fmt(e.a)} ≥ ${fmt(e.b)}) en ${lab(n)}: se poda ✕ ${e.cut.length} rama(s), ${e.ids.length} nodo(s) sin evaluar.`;
+  if(e.term)return `Terminal <b>${lab(n)}</b>: el último objeto lo retiró ${opp(n.turn)} → <b>${fmt(e.v)}</b> para MAX.`;
+  return `<b>${lab(n)}</b> queda con valor <b>${fmt(e.v)}</b>.`;
+}
+
+/* ---------- Dibujo ---------- */
+function boardHTML(cur,prev,inter){
+  return cur.map((c,r)=>{
+    const tot=prev?prev[r]:c;let p='';
+    for(let i=0;i<tot;i++)p+=i<c?`<button class="pc" data-r="${r}" data-i="${i}" ${inter?'':'disabled'} aria-label="Fila ${r+1}, ficha ${i+1}"></button>`:`<span class="pc gh"></span>`;
+    return `<div class="row"><b>Fila ${r+1}</b><div class="pcs">${p||'<span class="mut">vacía</span>'}</div></div>`;
+  }).join('');
+}
+function drawTree(st,act,e){
+  const X=n=>30+n.x*STEP,Y=n=>44+n.d*84;
+  let s='';
+  nodes.forEach(n=>n.ch.forEach(c=>{
+    const q=st[c.id],cut=q&&q.s==='cut',best=n.id===0&&n.bestId===c.id&&st[0]&&st[0].s==='done';
+    s+=`<line class="ed ${cut?'cut':''} ${best?'best':''}" x1="${X(n)}" y1="${Y(n)}" x2="${X(c)}" y2="${Y(c)}"/>`;
+  }));
+  nodes.forEach(n=>{
+    const q=st[n.id],c=['nd',n.turn.toLowerCase(),q?q.s:'idle'];
+    if(!n.ch.length)c.push('term');if(n.id===e.id)c.push('act');if(n.id===sel)c.push('sel');
+    const t=q&&q.s==='cut'?'✕':q&&q.v!=null?fmt(q.v):'';
+    s+=`<g class="${c.join(' ')}" data-id="${n.id}" transform="translate(${X(n)},${Y(n)})"><circle r="17"/><text class="v" y="4">${t}</text><text class="l" y="33">${lab(n)}</text>`;
+    if(n.id===e.id&&S.algo==='ab')s+=`<text class="ab" y="-25">α=${fmt(e.a)} β=${fmt(e.b)}</text>`;
+    s+='</g>';
+  });
+  const t=$('#tree');t.setAttribute('width',(root.slots-1)*STEP+60);t.setAttribute('height',44+(Math.max(...nodes.map(n=>n.d))+1)*84);
+  t.innerHTML=s;
+  const box=$('#scroll');box.scrollTo({left:X(nodes[e.id])-box.clientWidth/2,behavior:'smooth'});
+}
+function render(){
+  const e=ev[step],st=derive(step),act=sel!==null?sel:e.id,n=nodes[act],p=n.parent;
+  $('#gt').textContent='Estado '+lab(n);
+  $('#board').innerHTML=boardHTML(n.rows,p?p.rows:null,false);
+  const term=!n.ch.length;
+  $('#turn').innerHTML=`<span class="bd ${term?'term':n.turn.toLowerCase()}">${term?'Terminal · gana '+opp(n.turn):'Turno de '+n.turn}</span> <span class="mut">${n.move?opp(n.turn)+' retiró '+n.move.k+' de la fila '+(n.move.r+1)+' (fichas punteadas)':'Estado inicial'}</span>`;
+  $('#moves').innerHTML=n.ch.length?n.ch.map(c=>{const q=st[c.id],cut=q&&q.s==='cut';
+    return `<button class="chip ${cut?'cutc':''}" data-go="${c.id}">F${c.move.r+1} −${c.move.k} → ${lab(c)}<i>${cut?'✕':q&&q.s==='done'?fmt(q.v):'·'}</i></button>`}).join(''):'<span class="mut">Sin movimientos: fin del juego.</span>';
+  let seen=0,cut=0;for(let i=0;i<=step;i++){if(ev[i].t==='in')seen++;if(ev[i].t==='prune')cut+=ev[i].ids.length}
+  $('#stats').innerHTML=`<span class="pill">Paso <b>${step+1}/${ev.length}</b></span><span class="pill">Evaluados <b>${seen}/${nodes.length}</b></span>`+(S.algo==='ab'?`<span class="pill">Podados <b>${cut}</b></span><span class="pill">α <b>${fmt(e.a)}</b> · β <b>${fmt(e.b)}</b></span>`:'');
+  $('#desc').innerHTML=desc(e);
+  const f=$('#final'),last=step===ev.length-1;f.hidden=!last;
+  if(last){const b=nodes[root.bestId],cnt=k=>evs[k].filter(x=>x.t==='in').length,m=cnt('mm'),a=cnt('ab');
+    f.innerHTML=`<b>Valor de la raíz: ${fmt(ev[step].v)}</b> → ${ev[step].v>0?'MAX gana':'MIN gana'} con juego perfecto.<br>Mejor jugada de ${root.turn}: fila ${b.move.r+1}, quitar ${b.move.k} → ${lab(b)}.<br>Minimax evalúa ${m} nodos; Alfa-Beta ${a} (evita ${m-a}${m?', '+Math.round((m-a)/m*100)+'%':''}).`}
+  drawTree(st,act,e);
+}
+
+/* ---------- Modo jugar (humano = MIN, MAX usa Minimax) ---------- */
+const memo={};
+function val(r,t){
+  if(!r.some(x=>x))return t==='MAX'?-1:1;
+  const key=r+t;if(key in memo)return memo[key];
+  let best=t==='MAX'?-1:1;
+  for(let i=0;i<r.length;i++)for(let k=1;k<=r[i];k++){const nr=r.slice();nr[i]-=k;const v=val(nr,opp(t));best=t==='MAX'?Math.max(best,v):Math.min(best,v)}
+  return memo[key]=best;
+}
+function aiPick(){
+  for(let i=0;i<pr.length;i++)for(let k=1;k<=pr[i];k++){const nr=pr.slice();nr[i]-=k;if(val(nr,'MIN')===1)return[i,k]}
+  const i=pr.findIndex(x=>x);return[i,1];
+}
+function pMove(r,k,who){
+  pr[r]-=k;pmsg=`${who} retiró ${k} de la fila ${r+1}.`;
+  if(!pr.some(x=>x)){pover=who;pmsg+=` ${who} retiró el último objeto: ¡gana ${who}!`}
+  else pturn=opp(who);
+  pRender();
+  if(!pover&&pturn==='MAX')ptimer=setTimeout(()=>{const[i,k2]=aiPick();pMove(i,k2,'MAX')},700);
+}
+function pRender(){
+  const human=pturn==='MIN'&&!pover;
+  $('#gt').textContent='Partida contra MAX';
+  $('#board').innerHTML=boardHTML(pr,null,human);
+  $('#turn').innerHTML=pover?`<span class="bd term">Fin · gana ${pover}</span>`:`<span class="bd ${pturn.toLowerCase()}">Turno de ${pturn}${human?' (tú)':''}</span>`;
+  $('#pmsg').textContent=pmsg;
+  $('#pwin').textContent=pover?'':`Con juego perfecto desde aquí, gana ${val(pr,pturn)===1?'MAX':'MIN'}.`;
+}
+function pStart(){
+  clearTimeout(ptimer);pr=rows0.slice();pturn=S.first;pover=null;pmsg=S.first==='MAX'?'MAX piensa…':'Tú eres MIN y empiezas.';
+  pRender();
+  if(pturn==='MAX')ptimer=setTimeout(()=>{const[i,k]=aiPick();pMove(i,k,'MAX')},700);
+}
+
+/* ---------- Control ---------- */
+function stop(){clearInterval(timer);timer=null;$('#bA').textContent='▶ Auto'}
+function go(k){stop();step=Math.max(0,Math.min(ev.length-1,k));sel=null;render()}
+function init(){
+  stop();clearTimeout(ptimer);
+  rows0=S.state.split(',').map(Number);nodes=[];root=build(rows0,S.first,null,null);layout();
+  evs={mm:trace(false),ab:trace(true)};ev=evs[S.algo];step=0;sel=null;
+  document.body.dataset.mode=S.mode;
+  document.querySelectorAll('[data-k]').forEach(b=>b.classList.toggle('on',S[b.dataset.k]===b.dataset.v));
+  S.mode==='pl'?pStart():render();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-k]');if(b){S[b.dataset.k]=b.dataset.v;init();return}
+  const c=e.target.closest('[data-go]');if(c){sel=+c.dataset.go;render();return}
+  const g=e.target.closest('.nd');if(g){sel=+g.dataset.id;render();return}
+  const pc=e.target.closest('button.pc');
+  if(pc&&S.mode==='pl'&&pturn==='MIN'&&!pover){const r=+pc.dataset.r;pMove(r,pr[r]-(+pc.dataset.i),'MIN')}
+});
+$('#sState').onchange=e=>{S.state=e.target.value;init()};
+$('#sFirst').onchange=e=>{S.first=e.target.value;init()};
+$('#bF').onclick=()=>go(0);$('#bP').onclick=()=>go(step-1);$('#bN').onclick=()=>go(step+1);$('#bE').onclick=()=>go(ev.length-1);
+$('#bR').onclick=()=>{init()};$('#pre').onclick=pStart;
+$('#bA').onclick=()=>{
+  if(timer){stop();return}
+  if(step>=ev.length-1)step=0;
+  $('#bA').textContent='⏸ Pausa';
+  const tick=()=>{if(step<ev.length-1){step++;sel=null;render()}else stop()};
+  tick();timer=setInterval(tick,+$('#sSpd').value);
+};
+$('#sSpd').onchange=()=>{if(timer){clearInterval(timer);timer=setInterval(()=>{if(step<ev.length-1){step++;sel=null;render()}else stop()},+$('#sSpd').value)}};
+document.addEventListener('keydown',e=>{if(S.mode!=='an'||/SELECT|INPUT/.test(e.target.tagName))return;if(e.key==='ArrowRight')go(step+1);if(e.key==='ArrowLeft')go(step-1)});
+init();
+</script>
+</body>
+</html>
