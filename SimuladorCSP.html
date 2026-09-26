@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador CSP — Asignación de tareas</title>
+<style>
+:root{
+  --bg:#f6f6f4; --surface:#ffffff; --border:#dcdcd6; --text:#1c1c1a; --text-2:#5b5b56;
+  --accent:#2f6fed; --accent-2:#0f9d70; --danger:#d64545; --warn:#c9791a; --chip:#eef0f2;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#15161a; --surface:#1e2025; --border:#33353b; --text:#eceef0; --text-2:#a8abb3; --chip:#2a2c31; }
+}
+:root[data-theme="dark"]{ --bg:#15161a; --surface:#1e2025; --border:#33353b; --text:#eceef0; --text-2:#a8abb3; --chip:#2a2c31; }
+html{ scroll-padding-top:env(safe-area-inset-top,0px); }
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+.wrap{max-width:960px;margin:0 auto;padding:28px 16px 56px;}
+h1{font-size:22px;font-weight:600;margin:0 0 4px;}
+h2{font-size:15px;font-weight:600;margin:0 0 10px;color:var(--text);}
+.subtitle{color:var(--text-2);font-size:13px;margin:0 0 20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.toprow{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none;}
+.toggle input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;}
+.stat{font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;background:var(--chip);white-space:nowrap;}
+.constraints ul, .solutions ul{list-style:none;margin:0;padding:0;font-size:13px;}
+.constraints li{padding:4px 0;color:var(--text-2);}
+.constraints li.active{color:var(--accent-2);font-weight:600;}
+.constraints li.inactive{color:var(--text-2);text-decoration:line-through;opacity:.7;}
+.varsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media (max-width:640px){ .varsGrid{grid-template-columns:1fr;} }
+.varCard{border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;transition:box-shadow .15s,border-color .15s;}
+.varCard.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,111,237,.22);}
+.varCard.danger{border-color:var(--danger);box-shadow:0 0 0 3px rgba(214,69,69,.22);}
+.varName{font-weight:700;font-size:15px;}
+.varAssigned{font-size:13px;color:var(--accent-2);font-weight:600;min-height:18px;margin:2px 0 6px;}
+.chip{display:inline-block;padding:4px 10px;margin:3px;border-radius:999px;background:var(--chip);font-size:12px;border:1px solid var(--border);}
+.chip.removed{opacity:.35;text-decoration:line-through;}
+.chip.assigned{background:var(--accent-2);color:#fff;border-color:var(--accent-2);font-weight:700;}
+.chip.hi-try{outline:2px solid var(--warn);}
+.chip.hi-bad{outline:2px solid var(--danger);text-decoration:line-through;}
+.statusMsg{font-size:14px;font-weight:500;margin-bottom:14px;min-height:20px;}
+.controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+.controls button{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px;}
+.controls button:disabled{opacity:.4;cursor:not-allowed;}
+.controls button:hover:not(:disabled){border-color:var(--accent);}
+.speedLabel{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;}
+.stepCounter{font-size:12px;color:var(--text-2);margin-left:auto;}
+.treeScroll{overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--bg);max-height:440px;}
+.treeScroll svg{display:block;}
+.node rect{fill:var(--surface);stroke:var(--border);stroke-width:1.5;}
+.node text{fill:var(--text);font-size:12.5px;font-family:inherit;}
+.node .nodeSub{font-size:10.5px;fill:var(--text-2);}
+.node-root rect{stroke:var(--text-2);stroke-width:2;}
+.node-trying rect{stroke:var(--warn);stroke-width:2;stroke-dasharray:5 4;fill:var(--chip);}
+.node-active rect{stroke:var(--accent);stroke-width:2;fill:var(--chip);}
+.node-done rect{stroke:var(--border);fill:var(--surface);opacity:.55;}
+.node-done text{opacity:.65;}
+.node-invalid rect{stroke:var(--danger);stroke-width:2;fill:rgba(214,69,69,.1);}
+.node-invalid .nodeTitle{fill:var(--danger);}
+.node-pruned rect{stroke:var(--danger);stroke-width:2.5;fill:rgba(214,69,69,.14);}
+.node-pruned .nodeSub{fill:var(--danger);font-weight:700;}
+.node-solution rect{stroke:var(--accent-2);stroke-width:2.5;fill:rgba(15,157,112,.14);}
+.node-solution .nodeSub{fill:var(--accent-2);font-weight:700;}
+.node-current rect{filter:drop-shadow(0 0 5px var(--accent));}
+.edge{stroke:var(--border);stroke-width:1.5;}
+.edge-solution{stroke:var(--accent-2);stroke-width:2;}
+.edge-pruned,.edge-invalid{stroke:var(--danger);stroke-width:2;}
+.edge-current{stroke:var(--accent);stroke-width:2.5;}
+.edgeLabel{font-size:11px;fill:var(--text-2);}
+.rowLabel{font-size:11px;fill:var(--text-2);font-weight:600;}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:10px;font-size:12px;color:var(--text-2);}
+.legend span.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+.sw-trying{border:2px dashed var(--warn);}
+.sw-active{border:2px solid var(--accent);}
+.sw-solution{border:2px solid var(--accent-2);background:rgba(15,157,112,.14);}
+.sw-pruned{border:2px solid var(--danger);background:rgba(214,69,69,.14);}
+.sw-invalid{border:2px solid var(--danger);background:rgba(214,69,69,.1);}
+.sw-done{border:2px solid var(--border);opacity:.6;}
+.solutions li{padding:5px 8px;border-radius:6px;background:var(--chip);margin-bottom:6px;}
+.solutions li.empty{background:none;color:var(--text-2);font-style:italic;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Simulador CSP — Asignación de tareas</h1>
+    <p class="subtitle">Backtracking + comprobación directa · orden de variables: Ana → Luis → Carlos</p>
+  </header>
+
+  <div class="toprow">
+    <label class="toggle"><input type="checkbox" id="toggleC3"><span>Activar restricción: Carlos ≠ T3</span></label>
+    <div class="stat" id="totalSolBadge">Total soluciones: —</div>
+  </div>
+
+  <section class="panel constraints">
+    <h2>Restricciones</h2>
+    <ul id="constraintsList"></ul>
+  </section>
+
+  <section class="panel domains">
+    <h2>Variables y dominios</h2>
+    <div class="varsGrid" id="varsGrid"></div>
+  </section>
+
+  <section class="panel status">
+    <div class="statusMsg" id="statusMsg">Pulsa «Siguiente» o «Reproducir» para comenzar.</div>
+    <div class="controls">
+      <button id="btnReset">⟲ Reiniciar</button>
+      <button id="btnPrev">◀ Anterior</button>
+      <button id="btnPlay">▶ Reproducir</button>
+      <button id="btnNext">Siguiente ▶</button>
+      <label class="speedLabel">Velocidad<input type="range" id="speed" min="300" max="2000" value="900" step="100"></label>
+      <span class="stepCounter" id="stepCounter">Paso 0 / 0</span>
+    </div>
+  </section>
+
+  <section class="panel tree">
+    <h2>Árbol de búsqueda</h2>
+    <div class="treeScroll"><div id="treeSvgHost"></div></div>
+    <div class="legend">
+      <span><span class="sw sw-trying"></span>Probando</span>
+      <span><span class="sw sw-active"></span>Activo / camino actual</span>
+      <span><span class="sw sw-solution"></span>Solución</span>
+      <span><span class="sw sw-pruned"></span>Podado (dominio vacío)</span>
+      <span><span class="sw sw-invalid"></span>Valor inválido</span>
+      <span><span class="sw sw-done"></span>Explorado (retroceso)</span>
+    </div>
+  </section>
+
+  <section class="panel solutions">
+    <h2>Soluciones <span id="solCount">(0)</span></h2>
+    <ul id="solList"></ul>
+  </section>
+</div>
+
+<script>
+(function(){
+  const ORDER = ['Ana','Luis','Carlos'];
+  const BASE = { Ana:['T1','T2'], Luis:['T1','T3'], Carlos:['T2','T3'] };
+  const ROWLABELS = ['Inicio','Ana','Luis','Carlos'];
+  const COLW=132, ROWH=98, NODEW=118, NODEH=56, MARGINX=54, MARGINY=26, LABELCOLW=58;
+
+  let steps=[], idx=0, initDomains={}, totalSolutions=0, playTimer=null;
+  let treeNodes={}, treeRootId='n0', leafCount=1, posX={}, stepsByNode={};
+
+  // Motor de backtracking: construye el log de pasos Y, en paralelo, el árbol
+  // real de nodos/aristas (mismo recorrido, mismas podas).
+  function buildSteps(restrict){
+    const domains = { Ana:BASE.Ana.slice(), Luis:BASE.Luis.slice(), Carlos: restrict ? ['T2'] : BASE.Carlos.slice() };
+    const init = { Ana:domains.Ana.slice(), Luis:domains.Luis.slice(), Carlos:domains.Carlos.slice() };
+    const assignment = {}; const out = []; let solCount = 0;
+    const nodes = {}; let seq = 0;
+    const rootId = 'n0';
+    nodes[rootId] = { id:rootId, parentId:null, depth:0, varName:null, value:null, kind:'root', children:[] };
+
+    function snap(){ return { d:{Ana:domains.Ana.slice(),Luis:domains.Luis.slice(),Carlos:domains.Carlos.slice()}, a:{...assignment} }; }
+    function push(depth,type,v,val,msg,nodeId){ const s=snap(); out.push({depth,type,var:v,value:val,msg,domains:s.d,assignment:s.a,nodeId}); }
+
+    push(0,'start',null,null, `Dominios iniciales — Ana:{${domains.Ana.join(', ')}}  Luis:{${domains.Luis.join(', ')}}  Carlos:{${domains.Carlos.join(', ')}}`, rootId);
+
+    function recurse(i, parentId){
+      if(i===ORDER.length){
+        solCount++;
+        nodes[parentId].kind='solution';
+        nodes[parentId].solutionIndex=solCount;
+        push(i,'solution',null,null, `Solución ${solCount}: `+ORDER.map(v=>`${v}=${assignment[v]}`).join(', '), parentId);
+        return;
+      }
+      const v = ORDER[i];
+      push(i,'select',v,null, `Turno de ${v} — dominio actual: {${domains[v].join(', ')}}`, parentId);
+      for(const val of domains[v].slice()){
+        seq++; const nodeId='n'+seq;
+        nodes[nodeId] = { id:nodeId, parentId, depth:i+1, varName:v, value:val, kind:'trying', children:[] };
+        nodes[parentId].children.push(nodeId);
+        push(i,'try',v,val, `Probando ${v} = ${val}`, nodeId);
+        if(Object.values(assignment).includes(val)){
+          nodes[nodeId].kind='invalid';
+          push(i,'invalid',v,val, `${v} = ${val} no es válido (la tarea ya fue asignada)`, nodeId);
+          continue;
+        }
+        assignment[v] = val;
+        const prev = {};
+        for(let j=i+1;j<ORDER.length;j++){
+          const o = ORDER[j];
+          if(domains[o].includes(val)){ prev[o]=domains[o].slice(); domains[o]=domains[o].filter(x=>x!==val); }
+        }
+        const changed = Object.keys(prev);
+        nodes[nodeId].kind='assigned';
+        push(i,'update',v,val, changed.length
+          ? `${v} = ${val} asignado → se elimina ${val} de: ${changed.map(o=>'Dom('+o+')').join(', ')}`
+          : `${v} = ${val} asignado (no afecta a otros dominios)`, nodeId);
+
+        let dead=null;
+        for(let j=i+1;j<ORDER.length;j++){ if(domains[ORDER[j]].length===0){ dead=ORDER[j]; break; } }
+
+        if(dead){
+          nodes[nodeId].kind='pruned';
+          nodes[nodeId].deadVar=dead;
+          push(i,'empty',dead,null, `Dominio de ${dead} queda vacío → esta rama no puede producir solución`, nodeId);
+          push(i,'backtrack',v,val, `Retroceso: se deshace ${v} = ${val}`, nodeId);
+        } else {
+          recurse(i+1, nodeId);
+          if(i+1<ORDER.length) nodes[nodeId].kind='internal';
+          push(i,'backtrack',v,val, `Retroceso desde ${v} = ${val} para probar otra alternativa`, nodeId);
+        }
+        delete assignment[v];
+        for(const o of changed) domains[o]=prev[o];
+      }
+    }
+    recurse(0, rootId);
+    push(0,'done',null,null, `Búsqueda completa: ${solCount} solución(es) encontrada(s) en total`, rootId);
+    return { steps: out, init, total: solCount, nodes, rootId };
+  }
+
+  // Layout tipo árbol: hojas ubicadas en columnas secuenciales, los nodos
+  // internos se centran sobre el promedio de sus hijos.
+  function layoutTree(nodes, rootId){
+    let leafIdx=0; const px={};
+    function assign(id){
+      const n=nodes[id];
+      if(n.children.length===0){ px[id]=(leafIdx+0.5)*COLW; leafIdx++; return px[id]; }
+      const xs=n.children.map(assign);
+      px[id]=xs.reduce((a,b)=>a+b,0)/xs.length;
+      return px[id];
+    }
+    assign(rootId);
+    return { px, leafCount: Math.max(leafIdx,1) };
+  }
+
+  function rebuild(){
+    const restrict = document.getElementById('toggleC3').checked;
+    const res = buildSteps(restrict);
+    steps=res.steps; initDomains=res.init; totalSolutions=res.total;
+    treeNodes=res.nodes; treeRootId=res.rootId;
+    const lay = layoutTree(treeNodes, treeRootId);
+    posX=lay.px; leafCount=lay.leafCount;
+    stepsByNode={};
+    steps.forEach((s,i)=>{ if(s.nodeId){ (stepsByNode[s.nodeId] ||= []).push({i,type:s.type}); } });
+    idx=0;
+    document.getElementById('totalSolBadge').textContent = `Total soluciones: ${totalSolutions}`;
+    renderConstraints(restrict);
+    render();
+  }
+
+  function renderConstraints(restrict){
+    const ul = document.getElementById('constraintsList'); ul.innerHTML='';
+    ['Cada persona realiza exactamente una tarea','Ninguna tarea se asigna a más de una persona',
+     'Ana ∈ {T1, T2} · Luis ∈ {T1, T3} · Carlos ∈ {T2, T3}'].forEach(t=>{
+      const li=document.createElement('li'); li.textContent=t; ul.appendChild(li);
+    });
+    const li=document.createElement('li');
+    li.className = restrict?'active':'inactive';
+    li.textContent = 'Carlos ≠ T3 — ' + (restrict?'ACTIVA':'inactiva');
+    ul.appendChild(li);
+  }
+
+  function chipClass(v,val,cur){
+    const av = cur.assignment[v];
+    if(av) return 'chip'+(val===av?' assigned':' removed');
+    if(!cur.domains[v].includes(val)) return 'chip removed';
+    if(cur.var===v && cur.value===val && cur.type==='try') return 'chip hi-try';
+    if(cur.var===v && cur.value===val && cur.type==='invalid') return 'chip hi-bad';
+    return 'chip';
+  }
+
+  // Determina el estado visual de un nodo del árbol según los pasos ya
+  // ejecutados (0..atIdx): oculto → probando → (activo|inválido|podado|solución) → explorado.
+  function phaseOf(nodeId, atIdx){
+    if(nodeId===treeRootId) return 'root';
+    const evs = stepsByNode[nodeId]||[];
+    let phase='hidden';
+    for(const e of evs){
+      if(e.i>atIdx) break;
+      if(e.type==='try') phase='trying';
+      else if(e.type==='invalid') phase='invalid';
+      else if(e.type==='update') phase='active';
+      else if(e.type==='empty') phase='pruned';
+      else if(e.type==='solution') phase='solution';
+      else if(e.type==='backtrack') phase = (phase==='pruned'||phase==='invalid'||phase==='solution') ? phase : 'done';
+    }
+    return phase;
+  }
+
+  function buildTreeSVG(atIdx){
+    const curId = steps[atIdx].nodeId;
+    const totalW = LABELCOLW + MARGINX*2 + leafCount*COLW;
+    const totalH = MARGINY*2 + 3*ROWH + NODEH;
+    let edgesSvg='', nodesSvg='';
+
+    function xOf(id){ return LABELCOLW + MARGINX + posX[id]; }
+    function yOf(depth){ return MARGINY + depth*ROWH + NODEH/2; }
+
+    function walk(id){
+      const node = treeNodes[id];
+      const phase = phaseOf(id, atIdx);
+      if(phase==='hidden') return;
+      const x = xOf(id), y = yOf(node.depth);
+      if(node.parentId){
+        const p = treeNodes[node.parentId];
+        const px2 = xOf(node.parentId), py2 = yOf(p.depth);
+        const isCur = id===curId;
+        edgesSvg += `<line class="edge edge-${phase}${isCur?' edge-current':''}" x1="${px2}" y1="${py2+NODEH/2}" x2="${x}" y2="${y-NODEH/2}"/>`;
+        const mx=(px2+x)/2, my=(py2+y)/2;
+        edgesSvg += `<text class="edgeLabel" x="${mx}" y="${my-4}" text-anchor="middle">${node.value}</text>`;
+      }
+      let title = node.kind==='root' ? 'Inicio' : `${node.varName} = ${node.value}`;
+      let sub='';
+      if(phase==='pruned') sub = `✗ Dom(${node.deadVar})=∅`;
+      else if(phase==='invalid') sub = '✗ ya asignada';
+      else if(phase==='solution') sub = `✓ Solución ${node.solutionIndex}`;
+      else if(phase==='trying') sub = 'probando…';
+      const isCur = id===curId;
+      nodesSvg += `<g class="node node-${phase}${isCur?' node-current':''}" transform="translate(${x},${y})">
+        <rect x="${-NODEW/2}" y="${-NODEH/2}" width="${NODEW}" height="${NODEH}" rx="10"></rect>
+        <text class="nodeTitle" x="0" y="${sub?-3:5}" text-anchor="middle">${title}</text>
+        ${sub?`<text class="nodeSub" x="0" y="14" text-anchor="middle">${sub}</text>`:''}
+      </g>`;
+      node.children.forEach(walk);
+    }
+    walk(treeRootId);
+
+    let labelsSvg='';
+    ROWLABELS.forEach((lab,i)=>{ labelsSvg += `<text class="rowLabel" x="6" y="${MARGINY+i*ROWH+NODEH/2+4}">${lab}</text>`; });
+
+    return `<svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" xmlns="http://www.w3.org/2000/svg">
+      <g class="edges">${edgesSvg}</g><g class="nodes">${nodesSvg}</g><g class="labels">${labelsSvg}</g>
+    </svg>`;
+  }
+
+  function render(){
+    const cur = steps[idx];
+    document.getElementById('statusMsg').textContent = cur.msg;
+    document.getElementById('stepCounter').textContent = `Paso ${idx} / ${steps.length-1}`;
+    document.getElementById('btnPrev').disabled = idx===0;
+    document.getElementById('btnNext').disabled = idx===steps.length-1;
+
+    const grid = document.getElementById('varsGrid'); grid.innerHTML='';
+    ORDER.forEach(v=>{
+      const card = document.createElement('div');
+      card.className = 'varCard'+(cur.var===v?' active':'')+((cur.type==='empty'&&cur.var===v)?' danger':'');
+      const assigned = cur.assignment[v];
+      const chips = initDomains[v].map(val=>`<span class="${chipClass(v,val,cur)}">${val}</span>`).join('');
+      card.innerHTML = `<div class="varName">${v}</div><div class="varAssigned">${assigned?('= '+assigned):'&nbsp;'}</div><div class="chips">${chips}</div>`;
+      grid.appendChild(card);
+    });
+
+    document.getElementById('treeSvgHost').innerHTML = buildTreeSVG(idx);
+
+    const sols = steps.slice(0, idx+1).filter(s=>s.type==='solution');
+    document.getElementById('solCount').textContent = `(${sols.length} de ${totalSolutions} en total)`;
+    const list = document.getElementById('solList');
+    list.innerHTML = sols.length ? sols.map(s=>`<li>${s.msg}</li>`).join('') : '<li class="empty">Aún no hay soluciones.</li>';
+  }
+
+  function next(){ if(idx<steps.length-1){ idx++; render(); } else stopPlay(); }
+  function prev(){ if(idx>0){ idx--; render(); } }
+  function stopPlay(){ clearInterval(playTimer); playTimer=null; document.getElementById('btnPlay').textContent='▶ Reproducir'; }
+  function togglePlay(){
+    if(playTimer){ stopPlay(); return; }
+    document.getElementById('btnPlay').textContent='⏸ Pausar';
+    const speed = +document.getElementById('speed').value;
+    playTimer = setInterval(()=>{ if(idx>=steps.length-1) stopPlay(); else next(); }, speed);
+  }
+
+  document.getElementById('btnNext').onclick = ()=>{ stopPlay(); next(); };
+  document.getElementById('btnPrev').onclick = ()=>{ stopPlay(); prev(); };
+  document.getElementById('btnReset').onclick = ()=>{ stopPlay(); idx=0; render(); };
+  document.getElementById('btnPlay').onclick = togglePlay;
+  document.getElementById('toggleC3').onchange = ()=>{ stopPlay(); rebuild(); };
+
+  rebuild();
+})();
+</script>
+</body>
+</html>
